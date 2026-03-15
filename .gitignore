@@ -1,0 +1,30 @@
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build folders
+dist/
+build/
+
+# Vite
+client/**/dist
+
+# dependency directories
+*/node_modules
+
+# IDE files
+.vscode/
+.idea/
+
+# package lock (optional)
+package-lock.json
