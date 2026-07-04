@@ -1,19 +1,19 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Home from './pages/Home'
-import Login from './pages/login'
-import Register from './pages/Register'
-import RecipeDetail from './pages/RecipeDetail'
-import CreateRecipe from './pages/CreateRecipe'
-import Profile from './pages/Profile'
-import ProfileCompletion from './pages/ProfileCompletion'
-import About from './pages/About'
-import PrivateRoute from './components/PrivateRoute'
-import Navbar from './components/Navbar'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import RecipeDetail from "./pages/RecipeDetail";
+import CreateRecipe from "./pages/CreateRecipe";
+import Profile from "./pages/Profile";
+import ProfileCompletion from "./pages/ProfileCompletion";
+import About from "./pages/About";
+import PrivateRoute from "./components/PrivateRoute";
+import Navbar from "./components/Navbar";
 
 export default function App() {
   return (
     <BrowserRouter>
-    <Navbar /> 
+      <Navbar />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
@@ -23,16 +23,31 @@ export default function App() {
         <Route path="/about" element={<About />} />
 
         {/* Protected Routes */}
-        <Route path="/create" element={
-          <PrivateRoute><CreateRecipe /></PrivateRoute>
-        } />
-        <Route path="/profile" element={
-          <PrivateRoute><Profile /></PrivateRoute>
-        } />
-        <Route path="/complete-profile" element={
-          <PrivateRoute><ProfileCompletion /></PrivateRoute>
-        } />
+        <Route
+          path="/create"
+          element={
+            <PrivateRoute>
+              <CreateRecipe />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/complete-profile"
+          element={
+            <PrivateRoute>
+              <ProfileCompletion />
+            </PrivateRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
