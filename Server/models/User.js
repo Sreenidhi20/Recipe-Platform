@@ -24,6 +24,44 @@ const userSchema = new Schema({
     type: String,
     default: 'No bio available',
   },
+  age: {
+    type: Number,
+    default: null,
+  },
+  dateOfBirth: {
+    type: Date,
+    default: null,
+  },
+  phone: {
+    type: String,
+    default: '',
+  },
+  location: {
+    type: String,
+    default: '',
+  },
+  socialMediaLinks: {
+    facebook: {
+      type: String,
+      default: '',
+    },
+    instagram: {
+      type: String,
+      default: '',
+    },
+    twitter: {
+      type: String,
+      default: '',
+    },
+    linkedin: {
+      type: String,
+      default: '',
+    },
+  },
+  profileCompleted: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
