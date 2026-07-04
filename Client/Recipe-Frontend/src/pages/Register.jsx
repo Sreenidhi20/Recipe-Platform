@@ -1,9 +1,11 @@
 import { useNavigate, Link } from "react-router-dom";
 import API from "../api/axios";
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   // ✅ Form state
   const [formData, setFormData] = useState({
@@ -50,7 +52,11 @@ export default function Register() {
 
       if (response.data.success) {
         setSuccess("Account created successfully!");
-        setTimeout(() => navigate("/login"), 1500);
+        // Store token in localStorage
+        localStorage.setItem("token", response.data.token);
+        // Set auth header
+        API.defaults.headers.common['Authorization'] = response.data.token;
+        setTimeout(() => navigate("/complete-profile"), 1500);
       }
     } catch (err) {
       if (err.response) {

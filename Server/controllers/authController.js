@@ -4,6 +4,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middleware/auth');
+const upload = require('../middleware/upload');
 const { body, validationResult } = require('express-validator');
 const jwtSecret = process.env.JWT_SECRET;
 
@@ -67,7 +68,8 @@ router.post('/login', [
             username: user.username,
             email: user.email, 
             profilePicture: user.profilePicture,
-            bio: user.bio
+            bio: user.bio,
+            profileCompleted: user.profileCompleted
         }});
     }
     catch (error) {
@@ -85,6 +87,85 @@ router.get('/profile', authMiddleware, async (req,res)=>{
     catch (error) {
         console.error(error.message);
         res.status(500).send('Server error');
+    }
+});
+
+// Complete user profile (after registration)
+router.post('/complete-profile', authMiddleware, upload.single('profilePicture'), async (req, res) => {
+    try {
+        const { bio, age, dateOfBirth, phone, location, facebook, instagram, twitter, linkedin } = req.body;
+        const userId = req.user.userId;
+
+        let updateData = {
+            bio: bio || '',
+            age: age ? parseInt(age) : null,
+            dateOfBirth: dateOfBirth || null,
+            phone: phone || '',
+            location: location || '',
+            profileCompleted: true,
+            socialMediaLinks: {
+                facebook: facebook || '',
+                instagram: instagram || '',
+                twitter: twitter || '',
+                linkedin: linkedin || ''
+            }
+        };
+
+        // If file is uploaded, add profile picture
+        if (req.file) {
+            updateData.profilePicture = req.file.path;
+        }
+
+        const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
+        
+        res.json({ 
+            success: true, 
+            message: 'Profile completed successfully', 
+            user 
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Update user profile
+router.put('/update-profile', authMiddleware, upload.single('profilePicture'), async (req, res) => {
+    try {
+        const { bio, age, dateOfBirth, phone, location, facebook, instagram, twitter, linkedin } = req.body;
+        const userId = req.user.userId;
+
+        let updateData = {};
+
+        if (bio) updateData.bio = bio;
+        if (age) updateData.age = parseInt(age);
+        if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+        if (phone) updateData.phone = phone;
+        if (location) updateData.location = location;
+
+        if (facebook || instagram || twitter || linkedin) {
+            updateData.socialMediaLinks = {
+                facebook: facebook || '',
+                instagram: instagram || '',
+                twitter: twitter || '',
+                linkedin: linkedin || ''
+            };
+        }
+
+        if (req.file) {
+            updateData.profilePicture = req.file.path;
+        }
+
+        const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
+        
+        res.json({ 
+            success: true, 
+            message: 'Profile updated successfully', 
+            user 
+        });
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
