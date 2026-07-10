@@ -1,10 +1,11 @@
 import React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../api/axios";
+import { useCreateRecipeMutation } from "../services/recipeApi";
 
 export default function CreateRecipe() {
   const navigate = useNavigate();
+  const [createRecipe, { isLoading: loading }] = useCreateRecipeMutation();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -17,7 +18,6 @@ export default function CreateRecipe() {
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [ingredientInput, setIngredientInput] = useState("");
 
@@ -97,8 +97,6 @@ export default function CreateRecipe() {
       return;
     }
 
-    setLoading(true);
-
     try {
       // Create FormData
       const data = new FormData();
@@ -116,23 +114,12 @@ export default function CreateRecipe() {
         data.append("image", image);
       }
 
-      // API call with FormData
-      const response = await API.post("/api/recipes", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
+      // API call with mutation
+      const result = await createRecipe(data).unwrap();
       setSuccess("Recipe created successfully!");
-      setTimeout(() => navigate(`/recipe/${response.data._id}`), 1000);
+      setTimeout(() => navigate(`/recipe/${result._id}`), 1000);
     } catch (err) {
-      if (err.response) {
-        setError(err.response.data.message || "Failed to create recipe.");
-      } else if (err.request) {
-        setError("Server not responding. Please try again later.");
-      } else {
-        setError("Unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+      setError(err.data?.message || "Failed to create recipe.");
     }
   };
 

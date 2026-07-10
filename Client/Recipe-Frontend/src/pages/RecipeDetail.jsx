@@ -1,55 +1,51 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import API from "../api/axios";
-import { useAuth } from "../context/AuthContext";
+import { useSelector } from "react-redux";
+import { selectCurrentUser } from "../services/authSlice";
+import { optimizeImage } from "../utils/cloudinary";
+import {
+  useGetRecipeByIdQuery,
+  useLikeRecipeMutation,
+} from "../services/recipeApi";
+import { useAddCommentMutation } from "../services/commentApi";
 import { useState, useEffect } from "react";
 
 export default function RecipeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const user = useSelector(selectCurrentUser);
 
-  const [recipe, setRecipe] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: recipe,
+    isLoading: loading,
+    error: apiError,
+    refetch,
+  } = useGetRecipeByIdQuery(id);
+  const [like] = useLikeRecipeMutation();
+  const [addComment] = useAddCommentMutation();
+
   const [error, setError] = useState("");
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
 
-  // Fetch recipe on page load
+  // Handle initial recipe load
   useEffect(() => {
-    fetchRecipe();
-  }, [id]);
+    if (apiError) {
+      setError(apiError.data?.message || "Failed to fetch recipe");
+    }
 
-  async function fetchRecipe() {
-    try {
-      setLoading(true);
-      setError("");
-      const response = await API.get(`/api/recipes/${id}`);
-      const recipeData = response.data; // response.data IS the recipe
-      setRecipe(recipeData);
-      setLikesCount(recipeData.likes?.length || 0);
+    if (recipe) {
+      setLikesCount(recipe.likes?.length || 0);
 
       // Check if current user already liked
-      if (user && recipeData.likes) {
-        const alreadyLiked = recipeData.likes.some(
-          (likeId) => likeId === user._id,
-        );
+      if (user && recipe.likes) {
+        const alreadyLiked = recipe.likes.some((likeId) => likeId === user._id);
         setLiked(alreadyLiked);
       }
-    } catch (err) {
-      if (err.response) {
-        setError(err.response.data.message || "Failed to fetch recipe");
-      } else if (err.request) {
-        setError("Server not responding. Please try again later.");
-      } else {
-        setError("Unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [recipe, apiError, user]);
 
   // Handle like
   async function handleLike() {
@@ -59,10 +55,9 @@ export default function RecipeDetail() {
     }
 
     try {
-      const response = await API.put(`/api/recipes/${id}/like`);
-      setLiked(response.data.liked);
-      // Update count locally instead
-      setLikesCount((prev) => (response.data.liked ? prev + 1 : prev - 1));
+      const result = await like(id).unwrap();
+      setLiked(result.liked);
+      setLikesCount((prev) => (result.liked ? prev + 1 : prev - 1));
     } catch (err) {
       console.error("Error liking recipe:", err);
     }
@@ -84,14 +79,8 @@ export default function RecipeDetail() {
     setCommentLoading(true);
 
     try {
-      const response = await API.post(`/api/recipes/${id}/comment`, {
-        text: commentText,
-      });
-
-      setRecipe((prev) => ({
-        ...prev,
-        comments: response.data.comments,
-      }));
+      await addComment({ recipeId: id, text: commentText }).unwrap();
+      await refetch();
       setCommentText("");
     } catch (err) {
       console.error("Error posting comment:", err);
@@ -135,8 +124,9 @@ export default function RecipeDetail() {
       {recipe.image && (
         <div className="w-full h-96 overflow-hidden bg-gray-200 dark:bg-gray-700">
           <img
-            src={recipe.image}
+            src={optimizeImage(recipe.image, 800)}
             alt={recipe.title}
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         </div>

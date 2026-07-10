@@ -1,13 +1,14 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../api/axios";
-import { useAuth } from "../context/AuthContext";
+import { useSelector, useDispatch } from "react-redux";
+import { selectCurrentUser, setCredentials } from "../services/authSlice";
 
 export default function ProfileCompletion() {
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
   const fileInputRef = useRef(null);
-  
+
   const [formData, setFormData] = useState({
     bio: "",
     age: "",
@@ -53,7 +54,7 @@ export default function ProfileCompletion() {
 
     try {
       const formDataToSend = new FormData();
-      
+
       // Append form fields
       Object.keys(formData).forEach((key) => {
         if (formData[key]) {
@@ -66,24 +67,33 @@ export default function ProfileCompletion() {
         formDataToSend.append("profilePicture", profilePicture);
       }
 
-      const response = await API.post("/api/auth/complete-profile", formDataToSend, {
-        headers: {
-          "Content-Type": "multipart/form-data",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/complete-profile`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${user?.token || localStorage.getItem("token")}`,
+          },
+          body: formDataToSend,
         },
-      });
+      );
 
-      if (response.data.success) {
+      const data = await response.json();
+
+      if (data.success) {
         setSuccess("Profile completed successfully!");
-        // Update auth context with user data
-        login(response.data.user, localStorage.getItem("token"));
+        // Update Redux store with user data
+        dispatch(
+          setCredentials({
+            user: data.user,
+            token: localStorage.getItem("token"),
+          }),
+        );
         setTimeout(() => navigate("/profile"), 1500);
       }
     } catch (err) {
-      if (err.response) {
-        setError(err.response.data.message || "Failed to complete profile");
-      } else {
-        setError("Server error. Please try again.");
-      }
+      console.error("Profile completion error:", err);
+      setError("Server error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -132,7 +142,9 @@ export default function ProfileCompletion() {
                 ) : (
                   <div className="text-center">
                     <div className="text-4xl text-white mb-2">📷</div>
-                    <p className="text-white text-xs font-semibold">Click to upload</p>
+                    <p className="text-white text-xs font-semibold">
+                      Click to upload
+                    </p>
                   </div>
                 )}
               </div>

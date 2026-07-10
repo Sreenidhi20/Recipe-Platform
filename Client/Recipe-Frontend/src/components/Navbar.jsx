@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useSelector, useDispatch } from "react-redux";
+import { selectCurrentUser, logout } from "../services/authSlice";
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const user = useSelector(selectCurrentUser);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
+    dispatch(logout());
     navigate("/");
     setDropdownOpen(false);
   };
@@ -21,7 +23,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <span className="text-2xl">🍴</span>
-            <span className="text-white font-bold text-xl hidden sm:inline">RecipeShare</span>
+            <span className="text-white font-bold text-xl hidden sm:inline">
+              RecipeShare
+            </span>
           </Link>
 
           {/* Center Navigation - Desktop */}
@@ -57,11 +61,16 @@ export default function Navbar() {
                   className="flex items-center space-x-2 focus:outline-none hover:opacity-90 transition-opacity"
                 >
                   <img
-                    src={user.profilePicture || "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"}
+                    src={
+                      user.profilePicture ||
+                      "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
+                    }
                     alt="User avatar"
                     className="w-8 h-8 rounded-full border-2 border-white"
                   />
-                  <span className="text-white text-sm font-medium hidden sm:inline">{user.username}</span>
+                  <span className="text-white text-sm font-medium hidden sm:inline">
+                    {user.username}
+                  </span>
                 </button>
 
                 {dropdownOpen && (

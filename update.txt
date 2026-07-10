@@ -1,0 +1,74 @@
+Why Images Re-fetch
+Your images are Cloudinary URLs stored in MongoDB. Every time RTK Query refetches recipes, the browser reloads the images because:
+
+No browser cache headers on Cloudinary responses
+RTK Query refetching the recipe list triggers React to re-render cards, which reloads <img> tags
+
+
+Fix 1 — RTK Query Cache Time (Most Important)
+By default RTK Query keeps data cached for 60 seconds after component unmounts. Increase it:
+javascript// recipeApi.js
+getRecipes: builder.query({
+    query: ({ page = 1, limit = 10 } = {}) =>
+        `/api/recipes?page=${page}&limit=${limit}`,
+    providesTags: ['Recipe'],
+    keepUnusedDataFor: 300, // ← cache for 5 minutes instead of 60 seconds
+}),
+
+getRecipeById: builder.query({
+    query: (id) => `/api/recipes/${id}`,
+    providesTags: ['Recipe'],
+    keepUnusedDataFor: 300,
+}),
+
+Fix 2 — Cloudinary Image Optimization
+Cloudinary serves images with cache headers. Add transformation parameters to your URL to enable aggressive caching:
+javascript// utils/cloudinary.js
+export function optimizeImage(url, width = 400) {
+    if (!url || !url.includes('cloudinary')) return url
+    // Insert transformation into Cloudinary URL
+    return url.replace('/upload/', `/upload/w_${width},q_auto,f_auto/`)
+}
+Then in RecipeCard.jsx:
+javascriptimport { optimizeImage } from '../utils/cloudinary'
+
+<img
+    src={optimizeImage(recipe.image, 400)}
+    alt={recipe.title}
+    loading="lazy"        // ← browser won't load until visible
+    className="w-full h-full object-cover"
+/>
+And in RecipeDetail.jsx:
+javascript<img
+    src={optimizeImage(recipe.image, 800)}
+    alt={recipe.title}
+    loading="lazy"
+    className="w-full h-full object-cover"
+/>
+What q_auto,f_auto does:
+
+q_auto — Cloudinary automatically picks best quality
+f_auto — serves WebP to modern browsers (30-40% smaller)
+w_400 — resizes to needed width, no more 4K images in a 400px card
+
+
+Fix 3 — Add loading="lazy" Everywhere
+This is the single biggest win — browser only loads images when they're about to enter the viewport:
+javascript// Every <img> tag in your app
+<img
+    src={recipe.image}
+    alt={recipe.title}
+    loading="lazy"    // ← add this
+    className="..."
+/>
+
+Fix 4 — Stable Keys for React
+If your recipe cards are getting different keys on re-render, React unmounts and remounts them, causing image reloads. Make sure:
+javascript// ✅ Always use _id, never index
+{recipes.map((recipe) => (
+    <RecipeCard key={recipe._id} recipe={recipe} />
+))}
+
+Summary — Apply in This Order
+FixImpactEffortloading="lazy" on all images🔥 High2 minskeepUnusedDataFor: 300 in RTK🔥 High1 minCloudinary q_auto,f_auto,w_x🔥 High5 minsStable key={recipe._id}Medium1 min
+Apply all four and your image loading will be dramatically faster. Let me know how it goes! 🚀

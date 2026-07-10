@@ -1,11 +1,13 @@
 import { useNavigate, Link } from "react-router-dom";
-import API from "../api/axios";
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useDispatch } from "react-redux";
+import { useLoginMutation } from "../services/authApi";
+import { setCredentials } from "../services/authSlice";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const dispatch = useDispatch();
+  const [login, { isLoading: loading }] = useLoginMutation();
 
   // ✅ Form state
   const [formData, setFormData] = useState({
@@ -15,7 +17,6 @@ export default function Login() {
 
   // ✅ Error + loading state
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
   // Update field values
@@ -42,28 +43,13 @@ export default function Login() {
       return;
     }
 
-    setLoading(true);
-
     try {
-      // API call
-      const response = await API.post("/api/auth/login", formData);
-
-      if (response.data.success) {
-        // Save user and token to context + localStorage
-        login(response.data.user, response.data.token);
-        setSuccess("Login successful!");
-        setTimeout(() => navigate("/"), 1000);
-      }
+      const result = await login(formData).unwrap();
+      dispatch(setCredentials({ user: result.user, token: result.token }));
+      setSuccess("Login successful!");
+      setTimeout(() => navigate("/"), 1000);
     } catch (err) {
-      if (err.response) {
-        setError(err.response.data.message || "Login failed. Please try again.");
-      } else if (err.request) {
-        setError("Server not responding. Please try again later.");
-      } else {
-        setError("Unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+      setError(err.data?.message || "Login failed. Please try again.");
     }
   }
 

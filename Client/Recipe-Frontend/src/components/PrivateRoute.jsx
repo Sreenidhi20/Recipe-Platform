@@ -1,7 +1,8 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useSelector } from "react-redux";
+import { selectIsAuthenticated } from "../services/authSlice";
 
 export default function PrivateRoute({ children }) {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" />;
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  return isAuthenticated ? children : <Navigate to="/login" />;
 }
