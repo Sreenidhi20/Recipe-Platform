@@ -1,22 +1,23 @@
 import { useNavigate, Link } from "react-router-dom";
-import API from "../api/axios";
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useDispatch } from "react-redux";
+import { useRegisterMutation } from "../services/authApi";
+import { setCredentials } from "../services/authSlice";
 
 export default function Register() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const dispatch = useDispatch();
+  const [register, { isLoading: loading }] = useRegisterMutation();
 
-  // ✅ Form state
+  //  Form state
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
   });
 
-  // ✅ Error + loading state
+  //  Error + loading state
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
   // Update field values
@@ -44,33 +45,17 @@ export default function Register() {
       setError("Password should be at least 6 characters long.");
       return;
     }
-    setLoading(true);
 
     try {
-      // API call
-      const response = await API.post("/api/auth/register", formData);
-
-      if (response.data.success) {
-        setSuccess("Account created successfully!");
-        // Store token in localStorage
-        localStorage.setItem("token", response.data.token);
-        // Set auth header
-        API.defaults.headers.common['Authorization'] = response.data.token;
-        setTimeout(() => navigate("/complete-profile"), 1500);
-      }
+      const result = await register(formData).unwrap();
+      dispatch(setCredentials({ user: result.user, token: result.token }));
+      setSuccess("Account created successfully!");
+      setTimeout(() => navigate("/complete-profile"), 1500);
     } catch (err) {
-      if (err.response) {
-        setError(
-          err.response.data.message ||
-            "Registration failed. Username or Email already exists.",
-        );
-      } else if (err.request) {
-        setError("Server not responding. Please try again later.");
-      } else {
-        setError("Unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+      setError(
+        err.data?.message ||
+          "Registration failed. Username or Email already exists.",
+      );
     }
   }
 

@@ -1,17 +1,30 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import API from "../api/axios";
-import { useAuth } from "../context/AuthContext";
+import { useNavigate, Link } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  selectCurrentUser,
+  setCredentials,
+  logout,
+} from "../services/authSlice";
+import { useGetProfileQuery } from "../services/authApi";
+import { useGetRecipesQuery } from "../services/recipeApi";
+import { optimizeImage } from "../utils/cloudinary";
 import RecipeCard from "../components/RecipeCard";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout, login } = useAuth();
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useGetProfileQuery();
+  const { data: recipesData } = useGetRecipesQuery();
   const fileInputRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
   const [myRecipes, setMyRecipes] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
@@ -35,61 +48,36 @@ export default function Profile() {
       return;
     }
 
-    fetchProfileData();
-  }, [user, navigate]);
+    if (profileData) {
+      setProfile(profileData);
+      setEditFormData({
+        bio: profileData.bio || "",
+        age: profileData.age || "",
+        dateOfBirth: profileData.dateOfBirth
+          ? profileData.dateOfBirth.split("T")[0]
+          : "",
+        phone: profileData.phone || "",
+        location: profileData.location || "",
+        facebook: profileData.socialMediaLinks?.facebook || "",
+        instagram: profileData.socialMediaLinks?.instagram || "",
+        twitter: profileData.socialMediaLinks?.twitter || "",
+        linkedin: profileData.socialMediaLinks?.linkedin || "",
+      });
+    }
 
-  async function fetchProfileData() {
-    try {
-      setLoading(true);
-      setError("");
+    if (profileError) {
+      setError(profileError.data?.message || "Failed to load profile");
+    }
 
-      // Fetch user profile
-      const profileResponse = await API.get("/api/auth/profile");
-      
-      // The response data is the profile object directly
-      const profileData = profileResponse.data;
-      
-      if (profileData && profileData.username) {
-        setProfile(profileData);
-        // Initialize edit form with current data
-        setEditFormData({
-          bio: profileData.bio || "",
-          age: profileData.age || "",
-          dateOfBirth: profileData.dateOfBirth ? profileData.dateOfBirth.split('T')[0] : "",
-          phone: profileData.phone || "",
-          location: profileData.location || "",
-          facebook: profileData.socialMediaLinks?.facebook || "",
-          instagram: profileData.socialMediaLinks?.instagram || "",
-          twitter: profileData.socialMediaLinks?.twitter || "",
-          linkedin: profileData.socialMediaLinks?.linkedin || "",
-        });
-      } else {
-        setError("Profile data not available");
-        return;
-      }
-
-      // Fetch all recipes and filter by current user
-      const recipesResponse = await API.get("/api/recipes");
-
-      const allRecipes = recipesResponse.data.recipes || [];
+    if (recipesData && user) {
+      const allRecipes = recipesData.recipes || [];
       const userRecipes = allRecipes.filter(
         (recipe) =>
           recipe.userId?._id === user._id || recipe.userId === user._id,
       );
       setMyRecipes(userRecipes);
-    } catch (err) {
-      console.error("Profile fetch error:", err);
-      if (err.response) {
-        setError(err.response.data.message || "Failed to load profile");
-      } else if (err.request) {
-        setError("Server not responding. Please try again later.");
-      } else {
-        setError("Unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [profileData, recipesData, user, profileError, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -116,7 +104,7 @@ export default function Profile() {
 
     try {
       const formDataToSend = new FormData();
-      
+
       // Append form fields
       Object.keys(editFormData).forEach((key) => {
         if (editFormData[key]) {
@@ -129,23 +117,35 @@ export default function Profile() {
         formDataToSend.append("profilePicture", fileInputRef.current.files[0]);
       }
 
-      const response = await API.put("/api/auth/update-profile", formDataToSend, {
-        headers: {
-          "Content-Type": "multipart/form-data",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/update-profile`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${user?.token || localStorage.getItem("token")}`,
+          },
+          body: formDataToSend,
         },
-      });
+      );
 
-      if (response.data.success) {
-        setProfile(response.data.user);
+      const data = await response.json();
+
+      if (data.success) {
+        setProfile(data.user);
         setPreviewImage(null);
         setEditMode(false);
-        // Update auth context
-        login(response.data.user, localStorage.getItem("token"));
+        // Update Redux store
+        dispatch(
+          setCredentials({
+            user: data.user,
+            token: localStorage.getItem("token"),
+          }),
+        );
         alert("Profile updated successfully!");
       }
     } catch (err) {
       console.error("Profile update error:", err);
-      alert(err.response?.data?.message || "Failed to update profile");
+      alert("Failed to update profile");
     } finally {
       setEditLoading(false);
     }
@@ -153,11 +153,11 @@ export default function Profile() {
 
   // Handle logout
   function handleLogout() {
-    logout();
+    dispatch(logout());
     navigate("/login");
   }
 
-  if (loading) {
+  if (profileLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
@@ -212,12 +212,14 @@ export default function Profile() {
                     <img
                       src={previewImage}
                       alt="Preview"
+                      loading="lazy"
                       className="w-full h-full object-cover"
                     />
                   ) : profile.profilePicture ? (
                     <img
-                      src={profile.profilePicture}
+                      src={optimizeImage(profile.profilePicture, 200)}
                       alt={profile.username}
+                      loading="lazy"
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -234,7 +236,7 @@ export default function Profile() {
                 <p className="text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
                   {profile.email}
                 </p>
-                
+
                 {profile.location && (
                   <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2 mb-2">
                     📍 {profile.location}
@@ -254,7 +256,7 @@ export default function Profile() {
                 )}
 
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
-                  Member since {" "}
+                  Member since{" "}
                   {new Date(profile.createdAt).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
@@ -374,12 +376,15 @@ export default function Profile() {
                       <img
                         src={previewImage}
                         alt="Profile preview"
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="text-center">
                         <div className="text-4xl text-white mb-2">📷</div>
-                        <p className="text-white text-xs font-semibold">Click to change</p>
+                        <p className="text-white text-xs font-semibold">
+                          Click to change
+                        </p>
                       </div>
                     )}
                   </div>
@@ -540,7 +545,8 @@ export default function Profile() {
           {myRecipes.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-gray-600 dark:text-gray-400 text-xl mb-6">
-                You haven't created any recipes yet. Let's share your culinary creations!
+                You haven't created any recipes yet. Let's share your culinary
+                creations!
               </p>
               <button
                 onClick={() => navigate("/create")}

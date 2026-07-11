@@ -1,43 +1,37 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import API from "../api/axios";
+import { useSelector } from "react-redux";
+import { selectCurrentUser } from "../services/authSlice";
+import { useGetRecipesQuery } from "../services/recipeApi";
 import RecipeCard from "../components/RecipeCard";
 import SearchBar from "../components/SearchBar";
-import { useAuth } from "../context/AuthContext";
 
 export default function Home() {
-  const { user } = useAuth();
+  const user = useSelector(selectCurrentUser);
+  const {
+    data: recipesData,
+    isLoading: loading,
+    error: apiError,
+  } = useGetRecipesQuery();
   const [recipes, setRecipes] = useState([]);
   const [filteredRecipes, setFilteredRecipes] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   // Fetch all recipes on page load
   useEffect(() => {
-    fetchRecipes();
-  }, []);
-
-  async function fetchRecipes() {
-    try {
-      setLoading(true);
-      setError("");
-      const response = await API.get("/api/recipes");
-      if (response.status === 200) {
-        setRecipes(response.data.recipes || []);
-        setFilteredRecipes(response.data.recipes || []);
-      }
-    } catch (err) {
-      if (err.response) {
-        setError(err.response.data.message || "Failed to fetch recipes");
-      } else if (err.request) {
-        setError("Server not responding. Please try again later.");
+    if (apiError) {
+      if (apiError.data?.message) {
+        setError(apiError.data.message);
       } else {
-        setError("Unexpected error occurred. Please try again.");
+        setError("Failed to fetch recipes");
       }
-    } finally {
-      setLoading(false);
+    } else if (recipesData) {
+      const recipeList = recipesData.recipes || [];
+      setRecipes(recipeList);
+      setFilteredRecipes(recipeList);
+      setError("");
     }
-  }
+  }, [recipesData, apiError]);
 
   // Handle search filter
   function handleSearch(query) {
@@ -48,7 +42,7 @@ export default function Home() {
     const filtered = recipes.filter(
       (recipe) =>
         recipe.title.toLowerCase().includes(query.toLowerCase()) ||
-        recipe.category.toLowerCase().includes(query.toLowerCase())
+        recipe.category.toLowerCase().includes(query.toLowerCase()),
     );
     setFilteredRecipes(filtered);
   }
@@ -101,7 +95,8 @@ export default function Home() {
                 Featured Recipes
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                {filteredRecipes.length} recipe{filteredRecipes.length !== 1 ? 's' : ''} found
+                {filteredRecipes.length} recipe
+                {filteredRecipes.length !== 1 ? "s" : ""} found
               </p>
             </div>
             {user && (
